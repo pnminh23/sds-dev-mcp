@@ -2,6 +2,9 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Config, requireValue, ResolvedRepo } from "./config.js";
 import { checkIssueKey } from "./jira.js";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { CODE_EXT, scanDiff } from "./sensors.js";
 
 const run = promisify(execFile);
 
@@ -154,8 +157,25 @@ export async function reviewDiff(cfg: Config, repo: ResolvedRepo, base?: string,
   const mergeBase = await git(cwd, ["merge-base", `origin/${baseBranch}`, "HEAD"]);
 
   const stat = await git(cwd, ["diff", "--stat", mergeBase]);
-  let diff = await git(cwd, ["diff", "--unified=8", "--no-color", mergeBase]);
-  const untracked = (await git(cwd, ["ls-files", "--others", "--exclude-standard"])).split("\n").filter(Boolean);
+  // quotePath=false: đường dẫn tiếng Việt không bị git bọc ngoặc kép/escape
+  let diff = await git(cwd, ["-c", "core.quotePath=false", "diff", "--unified=8", "--no-color", mergeBase]);
+  const untracked = (await git(cwd, ["-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard"]))
+    .split("\n")
+    .filter(Boolean);
+  // quét trên diff đầy đủ, trước khi cắt
+  const untrackedContents = untracked
+    .filter((f) => CODE_EXT.test(f))
+    .slice(0, 100)
+    .flatMap((f) => {
+      const p = join(cwd, f);
+      try {
+        return existsSync(p) && statSync(p).size <= 500_000 ? [{ file: f, content: readFileSync(p, "utf8") }] : [];
+      } catch {
+        return [];
+      }
+    });
+  const branchKey = branch.match(/([A-Z][A-Z0-9_]+)-\d+$/)?.[1];
+  const sensors = scanDiff(diff, untracked, untrackedContents, [...cfg.jira.projectKeys, ...(branchKey ? [branchKey] : [])]);
   const truncated = diff.length > maxBytes;
   if (truncated) diff = diff.slice(0, maxBytes);
 
@@ -167,6 +187,7 @@ export async function reviewDiff(cfg: Config, repo: ResolvedRepo, base?: string,
     mergeBase,
     stat,
     untrackedFiles: untracked.slice(0, 100),
+    sensors,
     truncated,
     note: truncated ? `Diff dài hơn ${maxBytes} ký tự, đã cắt. Đọc thêm file trực tiếp trong repoPath.` : undefined,
     diff,

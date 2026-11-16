@@ -2,6 +2,7 @@
   "jira": {
     "url": "DAN_DIA_CHI_JIRA_VD_https://jira.congty.vn",
     "token": "DAN_PERSONAL_ACCESS_TOKEN_JIRA_VAO_DAY",
+    "projectKeys": ["EBW", "EB133", "EB88"],
     "statuses": {
       "todo": "To do",
       "inProgress": "In Progress",

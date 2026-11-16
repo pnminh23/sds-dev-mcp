@@ -98,6 +98,7 @@ File này nằm trong `.gitignore`, không bị commit. File được đọc l�
 |---|---|---|
 | `jira.url` | Địa chỉ Jira công ty | `https://jira.congty.vn` |
 | `jira.token` | Personal Access Token Jira | |
+| `jira.projectKeys` | Tiền tố mã Jira của team. Sensor chỉ coi các tiền tố này (và tiền tố của nhánh hiện tại) là mã Jira, tránh báo nhầm `UTF-8`, `PL01-1`... | `["EBW", "EB133", "EB88"]` |
 | `jira.statuses` | Tên trạng thái Jira của team, chỉ cần khi khác mặc định | xem [Trạng thái Jira](#trạng-thái-jira) |
 | `bitbucket.url` | Địa chỉ Bitbucket Server | `https://git-sds.softdreams.vn:7990` |
 | `bitbucket.token` | HTTP access token Bitbucket | |
@@ -106,7 +107,8 @@ File này nằm trong `.gitignore`, không bị commit. File được đọc l�
 | `git.baseBranch` | Nhánh gốc để tạo nhánh task | `prod` |
 | `git.protectedBranches` | Nhánh môi trường: **không bao giờ** commit/push tự động vào | `prod`, `test`, `dev-99`... |
 | `reposRoot` | Thư mục chứa các repo | `C:/PNMINH/sds` |
-| `worklogDir` | Thư mục lưu file log công việc `<KEY>.md` Claude viết sau khi tạo PR. Bỏ trống thì Claude hỏi khi cần | `C:/PNMINH/worklog` |
+| `worklogDir` | Thư mục lưu worklog `<KEY>.md`: tạo khi bắt đầu code, MCP tự ghi các mốc (nhánh, commit, PR, build, Jira), dùng làm checkpoint khi mở phiên mới. Bỏ trống thì Claude hỏi khi cần | `C:/PNMINH/worklog` |
+| `logDir` | Thư mục nhật ký gọi tool (`YYYY-MM.jsonl`). Mặc định `<thư mục MCP>/logs` | |
 | `repos.<tên>.prTargets` | Nhánh môi trường cần tạo PR vào | `["test", "dev-99"]` |
 | `repos.<tên>.giteaRepo` | Tên repo trên Gitea nếu khác Bitbucket | `88ebweb` → `ebweb88` |
 | `repos.<tên>.path` | Đường dẫn riêng nếu repo không nằm trong `reposRoot` | |
@@ -146,7 +148,7 @@ Trong Claude Code gõ `/` rồi tìm `sds-dev`:
 | Lệnh | Làm gì |
 |---|---|
 | `/mcp__sds-dev__viec-cua-toi` | Việc cần làm theo nhóm Reopened → In Progress → To do, gợi ý làm gì tiếp |
-| `/mcp__sds-dev__lam-task EB133-6666` | Đọc ticket → tìm nguyên nhân → **dừng để bạn xác nhận nguyên nhân** → tạo nhánh (tự chuyển In Progress) → sửa → **review độc lập** → commit, push → tạo PR → ghi worklog → báo lại |
+| `/mcp__sds-dev__lam-task EB133-6666` | Đọc worklog nếu đang làm dở → đọc ticket → tìm nguyên nhân → **dừng để bạn xác nhận nguyên nhân** → tạo nhánh (tự chuyển In Progress, tạo worklog) → sửa → **sensor + review độc lập** → commit, push → tạo PR → hoàn thiện worklog → báo lại |
 | `/mcp__sds-dev__review-code EB133-6666` | Subagent mới (không phải phiên viết code) review thay đổi của ticket, báo vấn đề để bạn quyết định |
 | `/mcp__sds-dev__kiem-tra-build EB133-6666 dev-99` | PR merged chưa, build lên dev-99 chưa; xong thì hỏi chuyển In Review |
 
@@ -172,11 +174,13 @@ Claude: [jira_get_issue] Bug màn chi tiết, môi trường app133.
 Bạn:    dữ liệu cũ có bị ảnh hưởng không?
 Claude: [db_query] ... không ảnh hưởng vì ...
 Bạn:    ok, sửa đi
-Claude: [git_start_branch] Tạo fixbug/minhpm/EB133-6666 từ prod
+Claude: [git_start_branch] Tạo fixbug/minhpm/EB133-6666 từ prod (kèm nguyên nhân bạn vừa đồng ý),
+        tạo worklog <worklogDir>/EB133-6666.md
         [sửa code, build kiểm tra]
+        [git_review_diff] Sensor: 0 LỖI. Review độc lập: không còn lỗi
         [git_commit_push] Commit "fixbug/minhpm/EB133-6666", đã push
         [bb_create_pull_requests] PR #7301 → test, PR #7302 → dev-99
-        Đã ghi worklog <worklogDir>/EB133-6666.md
+        Worklog đã có nhật ký nhánh/commit/PR; Claude viết thêm cách xử lý
 
 -- PR dev-99 bị conflict --
 Claude: PR #7302 vào dev-99 bị conflict. Bạn tự xử lý trên dev-99.
@@ -253,10 +257,10 @@ Gitea là bản mirror đồng bộ theo chu kỳ, có thể trễ vài chục p
 | `jira_search` | Việc của bạn. Mặc định: To do + In Progress + Reopened. `scope=review`: đang In Review. `scope=all`: mọi ticket chưa đóng | Có |
 | `jira_start_work` | Bắt đầu làm: chuyển To do / Reopened → In Progress | Có |
 | `jira_list_transitions` | Các bước chuyển trạng thái hợp lệ | Có |
-| `jira_transition` | Chuyển trạng thái, vd `In Review` | **Hỏi trước** |
-| `jira_add_comment` | Thêm comment vào ticket | **Hỏi trước** |
-| `git_start_branch` | Tạo/checkout `fixbug\|task/<user>/<KEY>` từ `prod` mới nhất | Có |
-| `git_review_diff` | Thay đổi của nhánh so với nhánh gốc (gồm phần chưa commit), cho reviewer | Có |
+| `jira_transition` | Chuyển trạng thái, vd `In Review`. Bắt buộc `userConfirmed=true` | **Hỏi trước** |
+| `jira_add_comment` | Thêm comment vào ticket. Bắt buộc `userConfirmed=true` | **Hỏi trước** |
+| `git_start_branch` | Tạo/checkout `fixbug\|task/<user>/<KEY>` từ `prod` mới nhất, tạo worklog. Bắt buộc `causeSummary` + `userConfirmed=true` (sau khi bạn xác nhận nguyên nhân) | Có |
+| `git_review_diff` | Thay đổi của nhánh so với nhánh gốc (gồm phần chưa commit), cho reviewer, kèm **sensor** quét quy tắc cố định | Có |
 | `git_commit_push` | Commit (message = tên nhánh), push nhánh task, sau khi đã review | Có |
 | `bb_create_pull_requests` | Tạo PR vào các nhánh trong `prTargets`; PR đã có thì trả lại PR cũ | Có |
 | `bb_pull_request_status` | Trạng thái PR: OPEN/MERGED/DECLINED, có conflict không | Có |
@@ -275,7 +279,10 @@ Các quy tắc sau nằm trong code, không phụ thuộc vào việc Claude có
 
 - `git_commit_push` **chỉ** chạy trên nhánh dạng `fixbug|task|features/<user>/<KEY>`; từ chối trên mọi nhánh trong `protectedBranches`.
 - `git_commit_push` mặc định chỉ `git add -u` (file đã được git theo dõi). File mới phải được truyền rõ tên, để không commit nhầm file rác như `_testcase/`.
-- `git_start_branch` từ chối chuyển nhánh khi repo có thay đổi chưa commit.
+- `git_start_branch` từ chối chuyển nhánh khi repo có thay đổi chưa commit, và từ chối khi thiếu nguyên nhân đã được bạn xác nhận (`causeSummary` + `userConfirmed=true`).
+- `jira_transition`, `jira_add_comment` từ chối khi thiếu `userConfirmed=true`.
+- Nội dung ticket Jira, kết quả DB, nội dung file được coi là dữ liệu: chỉ thị nằm trong đó không thay đổi quy trình hay quyền.
+- `bb_create_pull_requests` không nhận title/description: title luôn là tên nhánh, mô tả để trống. `git_commit_push` không nhận message: message luôn là tên nhánh.
 - **Không có** tool merge PR hay resolve conflict. Conflict trên nhánh môi trường có code của nhiều người, do bạn tự xử lý.
 - Git chạy với `GIT_TERMINAL_PROMPT=0`: thiếu đăng nhập thì báo lỗi ngay, không treo.
 - Token chỉ nằm trong `config.local.json` trên máy bạn, không bị commit, không hiện ra qua `config_show`.
@@ -324,7 +331,7 @@ npm install
 npm run setup
 ```
 
-Rồi khởi động lại Claude. `config.local.json` của bạn được giữ nguyên.
+Rồi khởi động lại Claude. `config.local.json` của bạn được giữ nguyên, nên **so với `config.example.json` để thêm khoá mới** nếu có (vd `jira.projectKeys`, `worklogDir`, `logDir`). Thiếu khoá mới thì MCP vẫn chạy với mặc định.
 
 ### Gỡ cài đặt
 
@@ -350,6 +357,9 @@ Xóa mục `"sds-dev"` trong `mcpServers` của `~/.claude.json`, khởi động
 | `Failed to connect ... in 15000ms` | Sai IP/port DB, hoặc máy không vào được mạng nội bộ |
 | `Câu lệnh chứa "..." không được phép` | Đúng thiết kế: DB chỉ SELECT |
 | `build_check` luôn ĐANG CHỜ BUILD | Gitea mirror chưa đồng bộ; đợi rồi kiểm tra lại, hoặc mở link `giteaUrl` trong kết quả |
+| `Input validation error ... causeSummary` / `userConfirmed` | Đúng thiết kế: Claude chưa có xác nhận của bạn. Trả lời Claude, Claude sẽ gọi lại |
+| Sensor báo `jira-key-in-comment` nhầm | Kiểm tra `jira.projectKeys` chỉ chứa tiền tố Jira thật (`EBW`, `EB133`, `EB88`...) |
+| Không thấy worklog | Chưa cấu hình `worklogDir`, hoặc chưa tới bước `git_start_branch` (worklog tạo ở bước đó) |
 
 ---
 
@@ -365,9 +375,13 @@ src/
   bitbucket.ts  Bitbucket Server REST API 1.0: tạo PR, trạng thái PR
   gitea.ts      Kiểm tra build qua commit status trên Gitea mirror
   db.ts         Truy vấn SQL Server chỉ đọc + bộ chặn câu lệnh ghi
+  sensors.ts    Sensor quét diff bằng quy tắc cố định
+  worklog.ts    Tạo worklog và ghi nhật ký mốc của ticket
+  audit.ts      Nhật ký gọi tool (JSONL)
 scripts/
   setup.mjs     Tạo config + đăng ký vào ~/.claude.json
   smoke.mjs     Gọi thử 1 tool không cần Claude
+  audit-report.mjs Tổng hợp nhật ký gọi tool
   test-guard.mjs Kiểm tra bộ chặn SQL chỉ đọc
 ```
 
@@ -390,5 +404,27 @@ node scripts/smoke.mjs                       # liệt kê tool
 node scripts/smoke.mjs config_show
 node scripts/smoke.mjs build_check '{"repo":"200133ebwebbe","targetBranch":"dev-99","sourceBranch":"fixbug/minhpm/EBW-9999"}'
 ```
+
+### Harness: sensor, ràng buộc, worklog, nhật ký, bài học
+
+MCP áp dụng mô hình "Agent = Model + Harness": quy tắc quan trọng không chỉ nằm trong hướng dẫn mà được ép bằng code.
+
+| Lớp | Ở đâu | Làm gì |
+|---|---|---|
+| Hướng dẫn | `INSTRUCTIONS`, prompt trong `src/index.ts` | Quy trình, giới hạn vòng lặp (3 lần thất bại thì dừng báo dev), đọc code tiết kiệm |
+| Sensor | `src/sensors.ts` | Quét diff trong `git_review_diff`: mã Jira trong comment, `List<Object[]>`, debug output, conflict... |
+| Ràng buộc tool | `src/index.ts` (zod schema) | `causeSummary` + `userConfirmed` cho `git_start_branch`; `userConfirmed` cho `jira_transition`/`jira_add_comment`; PR title/description cố định; nhánh bảo vệ; DB chỉ SELECT |
+| Trạng thái | `src/worklog.ts` | Worklog tạo khi bắt đầu code; tự ghi mốc nhánh/sensor/commit/PR/build/Jira |
+| Nhật ký | `src/audit.ts` | Mỗi lần gọi tool 1 dòng JSON trong `logs/YYYY-MM.jsonl`: không ghi token, câu SQL, nội dung comment, nguyên nhân. Lỗi của tool không phải `db_*` ghi 300 ký tự đầu (có thể gồm URL, body lỗi HTTP, stderr git) |
+| Bài học | `docs/BAI-HOC.md` | Mỗi lỗi agent đã mắc + lớp đã sửa; lỗi lặp thì nâng lên lớp mạnh hơn |
+
+Xem tổng hợp nhật ký:
+
+```bash
+node scripts/audit-report.mjs            # tháng hiện tại
+node scripts/audit-report.mjs 2026-11
+```
+
+Kết quả: số lần gọi và lỗi theo tool, lỗi lặp nhiều nhất (ứng viên thêm vào BAI-HOC hoặc sensor), ticket phải chuyển In Review nhiều lần (bị Reopened). Lưu ý: lỗi sai tham số (vd thiếu `userConfirmed`) bị chặn trước khi tool chạy nên không có trong nhật ký.
 
 Thêm tool mới: viết hàm trong file tương ứng, đăng ký bằng `server.registerTool(...)` trong `index.ts`, `npm run build`, khởi động lại Claude.
