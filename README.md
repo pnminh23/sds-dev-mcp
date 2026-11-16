@@ -371,7 +371,18 @@ scripts/
   test-guard.mjs Kiểm tra bộ chặn SQL chỉ đọc
 ```
 
-Chạy thử một tool không cần Claude:
+### Sửa xong thì làm gì để áp dụng
+
+| Sửa | Cần làm | Vì sao |
+|---|---|---|
+| `config.local.json` | Không cần, có hiệu lực ở lần gọi tool kế tiếp | MCP đọc lại file cấu hình mỗi lần gọi tool |
+| `src/*.ts` (tool, lệnh tắt, hướng dẫn quy trình) | `npm run build` → **tắt hẳn** Claude → mở lại → tạo **phiên mới** | Claude chạy `dist/index.js`; tiến trình MCP chỉ khởi động lại cùng Claude; phiên đang mở vẫn giữ hướng dẫn cũ |
+| `README.md`, `docs/` | Không cần | Chỉ là tài liệu |
+| Lần đầu cài, hoặc dời thư mục `sds-dev-mcp` | `npm run setup` → tắt hẳn Claude → mở lại | Đăng ký đường dẫn `dist/index.js` vào `~/.claude.json` |
+
+"Tắt hẳn" = thoát cả biểu tượng ở khay hệ thống, không chỉ đóng cửa sổ. Sau khi mở lại, gõ `gọi config_show` để kiểm tra.
+
+Chạy thử một tool không cần Claude (sau `npm run build`, dùng code mới ngay, không cần khởi động lại Claude):
 
 ```bash
 npm run build
