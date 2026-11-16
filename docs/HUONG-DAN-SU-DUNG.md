@@ -1,7 +1,7 @@
 # Hướng dẫn sử dụng sds-dev-mcp
 
 Tài liệu dành cho dev đã cài xong MCP (xem phần cài đặt trong [README](../README.md)).
-Nội dung: quy trình làm ticket, 4 lệnh tắt, 18 tool, câu hỏi mẫu, review độc lập, đọc DB, xử lý lỗi.
+Nội dung: quy trình làm ticket, 4 lệnh tắt, 18 tool, câu hỏi mẫu, review độc lập và sensor, worklog, nhật ký, bài học, đọc DB, xử lý lỗi.
 
 ---
 
@@ -12,11 +12,12 @@ Nội dung: quy trình làm ticket, 4 lệnh tắt, 18 tool, câu hỏi mẫu, r
 3. [Lệnh tắt](#3-lệnh-tắt)
 4. [Nói chuyện bình thường với Claude](#4-nói-chuyện-bình-thường-với-claude)
 5. [Danh sách tool chi tiết](#5-danh-sách-tool-chi-tiết)
-6. [Review code độc lập](#6-review-code-độc-lập)
-7. [Đọc database](#7-đọc-database)
-8. [Việc Claude tự làm và việc phải hỏi](#8-việc-claude-tự-làm-và-việc-phải-hỏi)
-9. [Một ngày làm việc mẫu](#9-một-ngày-làm-việc-mẫu)
-10. [Câu hỏi thường gặp và xử lý lỗi](#10-câu-hỏi-thường-gặp-và-xử-lý-lỗi)
+6. [Review code độc lập và sensor](#6-review-code-độc-lập-và-sensor)
+7. [Worklog, nhật ký và bài học](#7-worklog-nhật-ký-và-bài-học)
+8. [Đọc database](#8-đọc-database)
+9. [Việc Claude tự làm và việc phải hỏi](#9-việc-claude-tự-làm-và-việc-phải-hỏi)
+10. [Một ngày làm việc mẫu](#10-một-ngày-làm-việc-mẫu)
+11. [Câu hỏi thường gặp và xử lý lỗi](#11-câu-hỏi-thường-gặp-và-xử-lý-lỗi)
 
 ---
 
@@ -27,7 +28,7 @@ Mở Claude Code ở bất kỳ repo nào rồi gõ:
 | Muốn | Gõ |
 |---|---|
 | Xem hôm nay có việc gì | `/mcp__sds-dev__viec-cua-toi` |
-| Làm trọn một ticket | `/mcp__sds-dev__lam-task EBW-67919` |
+| Làm trọn một ticket (hoặc làm tiếp ticket dở, Reopened) | `/mcp__sds-dev__lam-task EBW-67919` |
 | Review code của ticket | `/mcp__sds-dev__review-code EBW-67919` |
 | Kiểm tra đã build lên môi trường chưa | `/mcp__sds-dev__kiem-tra-build EBW-67919 dev-99` |
 
@@ -64,7 +65,8 @@ Quy tắc: **bắt đầu code ticket nào thì ticket đó phải ở In Progre
         │                 + vị trí code + hướng sửa; bạn hỏi lại / bổ sung /
         │                 đổi hướng đến khi thống nhất
         │  bạn đồng ý rõ ràng
-        │  git_start_branch → nhánh fixbug|task/<user>/<KEY> từ prod
+        │  git_start_branch (bắt buộc causeSummary + userConfirmed=true)
+        │                   → nhánh fixbug|task/<user>/<KEY> từ prod
         │                   + ticket tự chuyển sang In Progress
         ▼
  Sửa code, build kiểm tra
@@ -79,13 +81,14 @@ Quy tắc: **bắt đầu code ticket nào thì ticket đó phải ở In Progre
         │
         ├── conflict? → DỪNG, bạn tự xử lý trên nhánh môi trường
         ▼
- Worklog → <worklogDir>/<KEY>.md (nguyên nhân, cách xử lý, repo/nhánh, link PR)
+ Worklog → <worklogDir>/<KEY>.md: tạo từ lúc tạo nhánh, MCP tự ghi nhật ký
+           nhánh/sensor/commit/PR/build/Jira; Claude viết nguyên nhân, cách xử lý
         │
         ▼
  PR merged → build_check → ĐÃ BUILD?
         │
         ▼
- jira_transition → In Review   (hỏi bạn trước)
+ jira_transition → In Review   (hỏi bạn trước, bắt buộc userConfirmed=true)
 ```
 
 ---
@@ -119,19 +122,23 @@ Lệnh tắt là kịch bản có sẵn: Claude làm đúng các bước theo th
 
 | Bước | Việc | Tool |
 |---|---|---|
+| 0 | Ticket làm dở / Reopened: đọc worklog `<worklogDir>/<KEY>.md` để biết đã làm tới đâu | `config_show` |
 | 1 | Đọc ticket: yêu cầu, môi trường, loại (bug → `fixbug`, task → `task`) | `jira_get_issue` |
 | 1 | Nếu ticket **Reopened**: đọc comment tester để biết lý do, làm tiếp trên nhánh cũ | `jira_get_issue` |
 | 2 | Đọc code, xác định repo và nguyên nhân, kèm bằng chứng. Chưa tạo nhánh, chưa sửa file. Yêu cầu mơ hồ → **hỏi bạn** | đọc file, `db_*` |
 | 2b | **Xác nhận nguyên nhân — Claude dừng chờ bạn.** Trình bày nguyên nhân, bằng chứng, vị trí code, hướng sửa, phạm vi. Bạn hỏi lại, bổ sung, đổi hướng; chỉ khi bạn đồng ý rõ ràng mới sang bước 3 | |
-| 3 | Bắt đầu code: tạo/checkout nhánh cho từng repo cần sửa, **ticket tự chuyển sang In Progress** | `git_start_branch` |
+| 3 | Bắt đầu code: tạo/checkout nhánh cho từng repo cần sửa, kèm **nguyên nhân bạn đã đồng ý**. **Ticket tự chuyển sang In Progress, worklog được tạo** | `git_start_branch` |
 | 4 | Sửa code trong phạm vi ticket, build kiểm tra. Comment ngắn gọn, **không ghi mã Jira** | |
-| 5 | **Review độc lập** bằng subagent mới; sửa theo review; có sửa thì review lại (tối đa 2 vòng) | `git_review_diff` |
+| 4 | (tiếp) Build hoặc cùng một lỗi thất bại **3 lần thì dừng, báo bạn**: lỗi, đã thử gì, đề xuất | |
+| 5 | **Review độc lập** bằng subagent mới; sửa theo review; có sửa thì review lại (tối đa 2 vòng). Mọi mục **LỖI** của sensor phải sửa trước khi commit | `git_review_diff` |
 | 6 | Commit + push | `git_commit_push` |
 | 7 | Tạo PR vào nhánh môi trường, **title = tên nhánh, mô tả trống**. Conflict → **dừng, báo bạn** | `bb_create_pull_requests` |
-| 8 | Viết worklog `<worklogDir>/<KEY>.md`: nguyên nhân, cách xử lý, repo/nhánh, link PR, việc tiếp theo (không commit). Chưa cấu hình `worklogDir` → hỏi bạn | |
+| 8 | Hoàn thiện worklog: cách xử lý, repo/nhánh, link PR, trạng thái các bước, việc tiếp theo (không commit). Nhật ký nhánh/commit/PR MCP đã tự ghi. Chưa cấu hình `worklogDir` → hỏi bạn | |
 | 9 | Báo lại: nguyên nhân, file sửa, kết quả review, nhánh, link PR, đường dẫn worklog, việc bạn cần làm | |
 
-**Sau lệnh này bạn cần:** review lại diff/PR, xử lý conflict nếu có, chờ PR merged rồi chạy `kiem-tra-build`.
+**Lưu ý:** ở bước 2b Claude **dừng hẳn** chờ bạn. Bạn hỏi lại, bổ sung hay yêu cầu điều tra thêm đều được; chỉ khi bạn nói rõ đồng ý (vd "ok, sửa đi") Claude mới gọi `git_start_branch` với nguyên nhân đó. Tool từ chối nếu thiếu.
+
+**Sau lệnh này bạn cần:** review lại diff/PR, xử lý conflict nếu có, chờ PR merged rồi chạy `kiem-tra-build`. Worklog nằm ở `<worklogDir>/<KEY>.md`.
 
 ---
 
@@ -148,7 +155,7 @@ Lệnh tắt là kịch bản có sẵn: Claude làm đúng các bước theo th
 2. Subagent tự đọc ticket trên Jira, tự lấy diff, tự đọc code xung quanh, rồi trả danh sách vấn đề: mức độ | file:dòng | vấn đề | tình huống gây lỗi | cách sửa.
 3. Claude trình bày từng vấn đề, nói đồng ý hay không và vì sao, rồi **hỏi bạn có sửa không**. Lệnh này không tự sửa.
 
-Chi tiết ở [mục 6](#6-review-code-độc-lập).
+Chi tiết ở [mục 6](#6-review-code-độc-lập-và-sensor).
 
 ---
 
@@ -164,8 +171,8 @@ Chi tiết ở [mục 6](#6-review-code-độc-lập).
 1. Tìm repo có nhánh của ticket.
 2. `bb_pull_request_status`: PR nào OPEN / MERGED / conflict.
 3. `build_check` cho từng PR đã MERGED.
-4. Báo bảng repo | nhánh đích | PR | build.
-5. Tất cả đã build → **hỏi bạn** có chuyển ticket sang In Review không.
+4. Báo bảng repo | nhánh đích | PR | build. Kết quả build tự ghi vào nhật ký worklog.
+5. Tất cả đã build → **hỏi bạn** có chuyển ticket sang In Review không. Đồng ý thì chuyển (tự ghi vào worklog) và cập nhật mục "Trạng thái các bước", "Việc tiếp theo".
 
 ---
 
@@ -204,6 +211,13 @@ Không cần nhớ lệnh tắt, Claude tự chọn tool. Câu mẫu:
 **Review**
 - "Review code EBW-67919"
 - "Review thay đổi trong repo 200133ebwebbe"
+- "Sensor có báo gì cho nhánh hiện tại không?"
+
+**Worklog, nhật ký, bài học**
+- "Đọc worklog EBW-67919 rồi làm tiếp"
+- "Cập nhật worklog EBW-67919: đã build dev-99"
+- "Tổng hợp nhật ký tool tháng này" → Claude chạy `node scripts/audit-report.mjs` trong thư mục MCP
+- "Thêm vào bài học: lần này Claude quên lọc CompanyID"
 
 ---
 
@@ -216,7 +230,7 @@ Ký hiệu cột "Tự động": **Có** = Claude gọi không cần hỏi; **H�
 #### `config_show`
 | | |
 |---|---|
-| Làm gì | Hiện file cấu hình đang dùng, Jira/Bitbucket đã có token chưa, danh sách repo, `prTargets`, `worklogDir`, DB, `blockedDbHosts`. Không hiện giá trị token/mật khẩu |
+| Làm gì | Hiện file cấu hình đang dùng, Jira/Bitbucket đã có token chưa, danh sách repo, `prTargets`, `worklogDir`, `logDir`, `mcpRoot`, DB, `blockedDbHosts`. Không hiện giá trị token/mật khẩu |
 | Tham số | không |
 | Tự động | Có |
 | Ví dụ | "gọi config_show" |
@@ -258,15 +272,15 @@ Ký hiệu cột "Tự động": **Có** = Claude gọi không cần hỏi; **H�
 #### `jira_transition`
 | | |
 |---|---|
-| Làm gì | Chuyển trạng thái theo tên bước chuyển hoặc tên trạng thái đích, vd `In Review` |
-| Tham số | `key`, `to` |
+| Làm gì | Chuyển trạng thái theo tên bước chuyển hoặc tên trạng thái đích, vd `In Review`. Tự ghi vào nhật ký worklog |
+| Tham số | `key`, `to`, `userConfirmed` (**bắt buộc** `true`: chỉ truyền khi bạn đã đồng ý) |
 | Tự động | **Hỏi** |
 
 #### `jira_add_comment`
 | | |
 |---|---|
 | Làm gì | Thêm comment vào ticket (vd ghi nguyên nhân, cách sửa, nhánh, PR) |
-| Tham số | `key`, `body` (wiki markup của Jira) |
+| Tham số | `key`, `body` (wiki markup của Jira), `userConfirmed` (**bắt buộc** `true`) |
 | Tự động | **Hỏi** |
 
 ### 5.3 Git
@@ -276,10 +290,10 @@ Tham số `repo` của các tool git/Bitbucket/build: tên repo trong cấu hìn
 #### `git_start_branch`
 | | |
 |---|---|
-| Làm gì | Bắt đầu code ticket: tạo hoặc checkout nhánh `<kind>/<user>/<KEY>` (nhánh mới tạo từ nhánh gốc, mặc định `prod`, sau khi `pull`; nhánh đã có thì checkout lại), **đồng thời chuyển ticket To do/Reopened sang In Progress** |
-| Kết quả | Thông tin nhánh + trường `jira` (đã chuyển / giữ nguyên / lỗi). Lỗi Jira không chặn việc tạo nhánh, Claude sẽ báo bạn |
-| Tham số | `repo`, `issueKey`, `kind`: `fixbug` / `task` / `features`, `base` (tùy chọn) |
-| Chặn | Từ chối nếu repo có thay đổi chưa commit và đang ở nhánh khác |
+| Làm gì | Bắt đầu code ticket **sau khi bạn đã xác nhận nguyên nhân**: tạo hoặc checkout nhánh `<kind>/<user>/<KEY>` (nhánh mới tạo từ nhánh gốc, mặc định `prod`, sau khi `pull`; nhánh đã có thì checkout lại), **chuyển ticket To do/Reopened sang In Progress**, **tạo worklog** ghi nguyên nhân đã xác nhận |
+| Kết quả | Thông tin nhánh + trường `jira` (đã chuyển / giữ nguyên / lỗi) + trường `worklog` (đường dẫn, tạo mới hay đã có). Lỗi Jira không chặn việc tạo nhánh, Claude sẽ báo bạn |
+| Tham số | `repo`, `issueKey`, `kind`: `fixbug` / `task` / `features`, `base` (tùy chọn), `causeSummary` (**bắt buộc**, ≥ 30 ký tự: nguyên nhân + hướng sửa bạn đã đồng ý), `userConfirmed` (**bắt buộc** `true`) |
+| Chặn | Thiếu `causeSummary`/`userConfirmed` → tool báo lỗi, không tạo nhánh. Từ chối nếu repo có thay đổi chưa commit và đang ở nhánh khác |
 | Tự động | Có |
 
 #### `git_review_diff`
@@ -287,13 +301,13 @@ Tham số `repo` của các tool git/Bitbucket/build: tên repo trong cấu hìn
 |---|---|
 | Làm gì | Lấy toàn bộ thay đổi của nhánh so với nhánh gốc (tính từ merge-base, gồm cả phần chưa commit) và danh sách file mới. Dùng cho reviewer |
 | Tham số | `repo`, `base` (tùy chọn) |
-| Kết quả | `branch`, `mergeBase`, `stat`, `diff` (tối đa 200.000 ký tự), `untrackedFiles` |
+| Kết quả | `branch`, `mergeBase`, `stat`, `diff` (tối đa 200.000 ký tự), `untrackedFiles`, `sensors` (xem [Sensor](#sensor-quét-diff)). Tự ghi kết quả sensor vào nhật ký worklog |
 | Tự động | Có |
 
 #### `git_commit_push`
 | | |
 |---|---|
-| Làm gì | Commit trên nhánh task hiện tại rồi push |
+| Làm gì | Commit trên nhánh task hiện tại rồi push. Tự ghi commit vào nhật ký worklog |
 | Commit message | **Luôn đúng bằng tên nhánh**, không thêm dòng nào khác (không có `Co-Authored-By: Claude`). Tool không nhận tham số message |
 | Tham số | `repo`, `files` (tùy chọn: danh sách file cần add, **bắt buộc với file mới**) |
 | Mặc định | `git add -u`: chỉ file đã được git theo dõi. File mới không tự vào commit |
@@ -306,7 +320,7 @@ Tham số `repo` của các tool git/Bitbucket/build: tên repo trong cấu hìn
 #### `bb_create_pull_requests`
 | | |
 |---|---|
-| Làm gì | Tạo PR từ nhánh task vào các nhánh môi trường. PR đã mở sẵn thì trả lại PR cũ |
+| Làm gì | Tạo PR từ nhánh task vào các nhánh môi trường. PR đã mở sẵn thì trả lại PR cũ. Tự ghi link PR vào nhật ký worklog |
 | Title, mô tả | Title **luôn là tên nhánh**, vd `fixbug/minhpm/EBW-67919`; mô tả **luôn để trống**. Tool không nhận title hay description, nên Claude không tự sinh nội dung hay thêm dòng "Generated with Claude Code" |
 | Tham số | `repo`, `targets` (tùy chọn, mặc định `prTargets` của repo), `sourceBranch` (mặc định nhánh hiện tại) |
 | Kết quả | Mỗi nhánh đích: `created` / `already-open` / `error`, số PR, link |
@@ -326,7 +340,7 @@ Tham số `repo` của các tool git/Bitbucket/build: tên repo trong cấu hìn
 #### `build_check`
 | | |
 |---|---|
-| Làm gì | Tìm commit **có tích xanh mới nhất** của nhánh môi trường trên Gitea mirror, rồi kiểm tra bằng git commit của bạn có nằm **dưới** nó không |
+| Làm gì | Tìm commit **có tích xanh mới nhất** của nhánh môi trường trên Gitea mirror, rồi kiểm tra bằng git commit của bạn có nằm **dưới** nó không. Tự ghi kết quả vào nhật ký worklog |
 | Tham số | `repo`, `targetBranch` (vd `dev-99`), `sourceBranch` hoặc `issueKey` (tùy chọn, mặc định nhánh hiện tại) |
 | Kết quả | `verdict`, commit tích xanh mới nhất, trạng thái các commit gần đây, thời điểm Gitea đồng bộ, link trang Gitea |
 | Tự động | Có |
@@ -364,7 +378,7 @@ Mã nguồn hiện tại trên DB của proc/function/view/trigger (chỉ đọc
 
 ---
 
-## 6. Review code độc lập
+## 6. Review code độc lập và sensor
 
 ### Vì sao
 
@@ -398,7 +412,84 @@ Mỗi vấn đề: **NGHIÊM TRỌNG / NÊN SỬA / GÓP Ý** | file:dòng | v�
 
 ---
 
-## 7. Đọc database
+### Sensor quét diff
+
+`git_review_diff` tự quét **các dòng được thêm** và **nội dung file code mới chưa add** bằng quy tắc cố định (không dùng LLM, không tốn token, kết quả luôn giống nhau). Kết quả ở trường `sensors`:
+
+| Quy tắc | Mức | Bắt gì |
+|---|---|---|
+| `jira-key-in-comment` | LỖI | Comment chứa mã Jira (`// EBW-123 ...`) |
+| `list-object-array` | LỖI | `List<Object[]>` trong Java |
+| `debug-output` | LỖI | `System.out/err.print`, `printStackTrace()`, `console.log` |
+| `conflict-marker` | LỖI | Dấu `<<<<<<<` / `>>>>>>>` còn sót |
+| `commented-out-code` | CẢNH BÁO | Comment trông như code bị comment bỏ |
+| `select-star` | CẢNH BÁO | `SELECT *` trong Java/SQL |
+| `junk-file` | CẢNH BÁO | File rác chưa được git theo dõi (`.log`, `.bak`, `target/`...) |
+
+**LỖI** phải sửa trước khi commit; **CẢNH BÁO** thì sửa hoặc ghi lý do giữ.
+
+Chi tiết:
+- **Mã Jira:** chỉ tiền tố trong `jira.projectKeys` và tiền tố của nhánh hiện tại, không phân biệt hoa thường. Nếu chưa cấu hình `jira.projectKeys` thì bắt mọi dạng `ABC-123`, trừ các chuẩn như UTF-8, SHA-256, ISO-8601.
+- **File mới chưa add:** quét tối đa 100 file code, mỗi file ≤ 500 KB. Vi phạm ở đây có `untracked: true`; chỉ cần sửa nếu file thuộc task và sẽ được commit.
+- `commented-out-code` chỉ áp dụng cho Java/TS/JS/Kotlin/Groovy. Comment khối nhiều dòng (dòng giữa `/* ... */` không có `*` đầu dòng) chưa được quét.
+- Tối đa 100 mục (LỖI xếp trước), `total` là tổng số.
+
+---
+
+## 7. Worklog, nhật ký và bài học
+
+### Worklog: checkpoint của ticket
+
+File `<worklogDir>/<KEY>.md` (xem `worklogDir` trong `config_show`). Không commit.
+
+**Khi nào tạo:** lúc `git_start_branch` chạy, tức ngay sau khi bạn xác nhận nguyên nhân. File có sẵn các mục:
+
+| Mục | Ai ghi |
+|---|---|
+| Thông tin (link Jira, người làm, thời điểm bắt đầu) | MCP, khi tạo file |
+| Trạng thái các bước (checklist) | Claude tick sau mỗi bước |
+| 1. Nguyên nhân (đã xác nhận với dev) | MCP, lấy từ `causeSummary` |
+| 2. Cách xử lý | Claude, khi sửa xong |
+| 3. Phạm vi code (repo, nhánh, nhánh gốc) | MCP ghi repo đầu tiên; Claude bổ sung repo khác |
+| 4. Pull request, 5. Việc tiếp theo | Claude |
+| Nhật ký tự động (cuối file) | MCP |
+
+**MCP tự ghi vào "Nhật ký tự động"** (chỉ khi file đã tồn tại):
+
+| Tool | Ghi gì |
+|---|---|
+| `git_start_branch` | Tạo/checkout nhánh nào, ở repo nào, nguyên nhân đã xác nhận |
+| `git_review_diff` | Kết quả sensor (số LỖI / CẢNH BÁO) |
+| `git_commit_push` | Mã commit, số file, đã push |
+| `bb_create_pull_requests` | Link từng PR (tạo mới / đã mở sẵn) hoặc lỗi |
+| `build_check` | Kết luận build (ĐÃ BUILD / ĐANG CHỜ / CHƯA MERGE) |
+| `jira_transition` | Trạng thái Jira mới |
+
+**Làm tiếp ở phiên mới / ticket Reopened:** `lam-task` đọc worklog trước để biết đã làm tới bước nào, không làm lại bước đã xong. Nói bình thường cũng được: "Đọc worklog EBW-67919 rồi làm tiếp".
+
+**An toàn:** MCP không bao giờ ghi đè worklog đã có (ticket Reopened thì chỉ ghi thêm nhật ký). Ghi worklog lỗi không làm hỏng tool chính.
+
+### Nhật ký gọi tool
+
+Mỗi lần gọi tool, MCP ghi 1 dòng JSON vào `<logDir>/YYYY-MM.jsonl` (mặc định `logs/` trong thư mục MCP, xem `config_show`):
+- **Có ghi:** thời gian, user, tên tool, mã ticket, các tham số an toàn (repo, nhánh, db, bảng...), thành công/lỗi, thời gian chạy.
+- **Không ghi:** token, câu SQL (chỉ ghi độ dài), nội dung comment Jira, nguyên nhân (`causeSummary`), danh sách file.
+- **Lỗi:** tool `db_*` không ghi chi tiết lỗi. Tool khác ghi 300 ký tự đầu (có thể gồm URL, body lỗi HTTP, stderr git), đã che `user:pass@` trong URL.
+- Lỗi sai tham số (vd thiếu `userConfirmed`) bị chặn trước khi tool chạy nên không có trong nhật ký.
+
+Tổng hợp: `node scripts/audit-report.mjs [YYYY-MM]` → số lần gọi và lỗi theo tool, lỗi lặp nhiều nhất (ứng viên cho [BAI-HOC.md](BAI-HOC.md)), ticket phải chuyển In Review nhiều lần. Sensor chỉ bắt lỗi hình thức; logic nghiệp vụ vẫn do reviewer subagent kiểm tra. Thêm quy tắc mới trong `src/sensors.ts` khi một lỗi lặp lại (xem [BAI-HOC.md](BAI-HOC.md)).
+
+### Bài học (ratchet)
+
+[BAI-HOC.md](BAI-HOC.md) ghi mỗi lỗi Claude đã mắc và lớp đã dùng để sửa: hướng dẫn → sensor → ràng buộc tool (càng về sau càng chắc chắn).
+
+- Khi Claude sai mà bạn phải sửa, Claude sẽ đề xuất thêm một dòng vào file này.
+- Lỗi đã có trong file mà lặp lại thì nâng lên lớp mạnh hơn, ví dụ thêm quy tắc vào `src/sensors.ts`.
+- Lỗi lặp nhiều trong `audit-report.mjs` cũng là ứng viên.
+
+---
+
+## 8. Đọc database
 
 **Chỉ đọc.** Cần sửa hoặc tạo dữ liệu để test, Claude sẽ viết câu SQL ra để **bạn tự chạy**.
 
@@ -415,7 +506,7 @@ Kiểm tra bộ chặn: `node scripts/test-guard.mjs`.
 
 ---
 
-## 8. Việc Claude tự làm và việc phải hỏi
+## 9. Việc Claude tự làm và việc phải hỏi
 
 **Quy tắc viết code:** sửa trong phạm vi ticket, thay đổi tối thiểu; comment ngắn gọn, xúc tích, chỉ khi cần giải thích lý do; **không ghi mã Jira vào comment** (mã ticket đã nằm trong tên nhánh và commit).
 
@@ -430,12 +521,13 @@ Kiểm tra bộ chặn: `node scripts/test-guard.mjs`.
 | Commit + push nhánh task | | Kết nối DB production |
 | Tạo PR vào `prTargets` | | |
 | Viết/cập nhật worklog trong `worklogDir` | | Commit file worklog |
+| Đề xuất thêm dòng vào `docs/BAI-HOC.md` khi mắc lỗi | | Tạo nhánh khi chưa có nguyên nhân đã xác nhận (tool chặn) |
 | Kiểm tra PR, build | | |
 | Đọc DB (SELECT) | | |
 
 ---
 
-## 9. Một ngày làm việc mẫu
+## 10. Một ngày làm việc mẫu
 
 ```
 08:30  /mcp__sds-dev__viec-cua-toi
@@ -447,11 +539,13 @@ Kiểm tra bộ chặn: `node scripts/test-guard.mjs`.
        → Nguyên nhân: ... (file:dòng, bằng chứng), hướng sửa dự kiến → DỪNG chờ bạn
        Bạn: "sao không sửa ở FE?"  → Claude giải thích, kiểm tra thêm
        Bạn: "ok, sửa đi"
-       → Tạo fixbug/minhpm/EBW-67919 ở 200133ebwebbe, ticket sang In Progress
+       → Tạo fixbug/minhpm/EBW-67919 ở 200133ebwebbe (kèm nguyên nhân đã xác nhận),
+         ticket sang In Progress, tạo worklog EBW-67919.md
        → Sửa, build OK
+       → Sensor: 1 LỖI (comment có mã Jira) → đã sửa
        → Review độc lập: 1 NÊN SỬA (thiếu kiểm tra list rỗng) → đã sửa → review lại: không còn lỗi
        → Commit, push, PR #7310 → dev-99-mix-200, PR #7311 → dev-99
-       → Ghi worklog <worklogDir>/EBW-67919.md
+       → Worklog <worklogDir>/EBW-67919.md: MCP đã tự ghi nhánh, sensor, commit, PR; Claude viết cách xử lý
 
 09:30  Bạn xem PR trên Bitbucket. PR #7311 conflict → bạn tự xử lý trên dev-99.
 
@@ -463,12 +557,13 @@ Kiểm tra bộ chặn: `node scripts/test-guard.mjs`.
 
 14:00  Tester chuyển EBW-67919 sang Reopened
        /mcp__sds-dev__lam-task EBW-67919
-       → Đọc comment tester, checkout lại nhánh cũ (ticket sang In Progress), sửa đúng phần tester nêu
+       → Đọc worklog + comment tester, trình bày nguyên nhân bị trả lại → DỪNG chờ bạn
+       → Bạn đồng ý → checkout lại nhánh cũ (ticket sang In Progress), sửa đúng phần tester nêu
 ```
 
 ---
 
-## 10. Câu hỏi thường gặp và xử lý lỗi
+## 11. Câu hỏi thường gặp và xử lý lỗi
 
 **Lệnh `/mcp__sds-dev__...` không hiện?**
 Tắt hẳn app Claude (cả biểu tượng ở khay hệ thống) rồi mở lại, tạo phiên mới.
@@ -478,6 +573,17 @@ Nói rõ: "Đọc EBW-67919, tìm nguyên nhân, chưa sửa code".
 
 **Muốn sửa xong nhưng chưa commit?**
 Nói rõ: "Làm EBW-67919 nhưng dừng trước khi commit".
+
+**Claude báo `Required at causeSummary` / `expected true at userConfirmed`?**
+Đúng thiết kế: Claude định tạo nhánh hoặc chuyển Jira khi bạn chưa đồng ý. Trả lời Claude (đồng ý hay chưa); Claude sẽ gọi lại với nguyên nhân bạn đã xác nhận.
+
+**Sensor báo nhầm?**
+- Mã Jira bị nhầm (vd tiền tố nghiệp vụ trùng dạng `ABC-123`): kiểm tra `jira.projectKeys` trong `config.local.json` chỉ có tiền tố Jira thật.
+- Quy tắc khác báo nhầm: bảo Claude giữ nguyên và ghi lý do. Báo nhầm lặp lại thì sửa quy tắc trong `src/sensors.ts`.
+- Mục có `untracked: true` thuộc file mới chưa add: file của việc khác thì bỏ qua.
+
+**Mở phiên mới giữa chừng ticket?**
+Gõ lại `/mcp__sds-dev__lam-task <KEY>`: Claude đọc worklog để làm tiếp.
 
 **Ticket cần sửa nhiều repo?**
 `lam-task` tạo nhánh cùng tên ở từng repo, review cả các repo, tạo PR cho từng repo theo `prTargets` riêng.
@@ -497,3 +603,5 @@ Nói rõ: "Làm EBW-67919 nhưng dừng trước khi commit".
 | `Câu lệnh chứa "..." không được phép` | Đúng thiết kế: DB chỉ SELECT |
 | `Login failed` / `Failed to connect` | Sai thông tin DB hoặc không vào được mạng nội bộ |
 | `build_check` mãi ĐANG CHỜ BUILD | Gitea mirror chưa đồng bộ, đợi rồi thử lại hoặc mở `giteaUrl` |
+| `Input validation error ... causeSummary` / `userConfirmed` | Đúng thiết kế: chưa có xác nhận của bạn. Trả lời Claude rồi để Claude gọi lại |
+| `worklog.note: Chưa cấu hình worklogDir` | Thêm `worklogDir` vào `config.local.json`, hoặc trả lời Claude muốn lưu ở đâu |

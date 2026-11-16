@@ -36,15 +36,18 @@ export const DEFAULT_STATUSES: JiraStatuses = {
 };
 
 export interface Config {
-  jira: { url: string; token: string; statuses: JiraStatuses };
+  /** projectKeys: tiền tố mã Jira của team (EBW, EB133...), sensor chỉ coi các tiền tố này là mã Jira */
+  jira: { url: string; token: string; statuses: JiraStatuses; projectKeys: string[] };
   bitbucket: { url: string; token: string };
   gitea?: { url: string; owner: string; token?: string };
   git: { user: string; baseBranch: string; protectedBranches: string[] };
   insecureTls?: boolean;
   /** Thư mục chứa các repo trên máy, vd C:/PNMINH/sds */
   reposRoot?: string;
-  /** Thư mục lưu file log công việc <KEY>.md sau khi tạo PR; bỏ trống = Claude hỏi khi cần */
+  /** Thư mục lưu worklog <KEY>.md (tạo khi bắt đầu code, MCP tự ghi mốc); bỏ trống = Claude hỏi khi cần */
   worklogDir?: string;
+  /** Thư mục nhật ký gọi tool (JSONL theo tháng); mặc định <thư mục MCP>/logs */
+  logDir?: string;
   repos: Record<string, RepoConfig>;
   /** DB local/test, CHỈ ĐỌC. Khóa là tên ngắn dùng khi gọi tool, vd "test1" */
   databases: Record<string, DbConfig>;
@@ -66,6 +69,11 @@ export interface DbConfig {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+/** Thư mục cài MCP (chứa docs/, logs/) */
+export function mcpRoot(): string {
+  return ROOT;
+}
+
 export function configPath(): string {
   return process.env.SDS_MCP_CONFIG ?? join(ROOT, "config.local.json");
 }
@@ -84,6 +92,7 @@ export function loadConfig(): Config {
       url: trimSlash(raw.jira?.url ?? ""),
       token: raw.jira?.token ?? "",
       statuses: { ...DEFAULT_STATUSES, ...(raw.jira?.statuses ?? {}) },
+      projectKeys: Array.isArray(raw.jira?.projectKeys) ? raw.jira.projectKeys.map(String) : [],
     },
     bitbucket: { url: trimSlash(raw.bitbucket?.url ?? ""), token: raw.bitbucket?.token ?? "" },
     gitea: raw.gitea ? { ...raw.gitea, url: trimSlash(raw.gitea.url) } : undefined,
@@ -95,6 +104,7 @@ export function loadConfig(): Config {
     insecureTls: raw.insecureTls ?? false,
     reposRoot: raw.reposRoot,
     worklogDir: raw.worklogDir,
+    logDir: raw.logDir,
     repos: raw.repos ?? {},
     databases: raw.databases ?? {},
     blockedDbHosts: raw.blockedDbHosts ?? [],
