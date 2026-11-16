@@ -1,0 +1,29 @@
+{
+  "name": "sds-dev-mcp",
+  "version": "0.1.0",
+  "description": "MCP server hỗ trợ quy trình làm ticket Jira: nhánh git, commit/push, pull request Bitbucket, kiểm tra build Gitea, chuyển trạng thái Jira",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "sds-dev-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "setup": "npm run build && node scripts/setup.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "mssql": "^11.0.2",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.11",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

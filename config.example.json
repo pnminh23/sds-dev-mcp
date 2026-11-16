@@ -1,0 +1,92 @@
+{
+  "jira": {
+    "url": "DAN_DIA_CHI_JIRA_VD_https://jira.congty.vn",
+    "token": "DAN_PERSONAL_ACCESS_TOKEN_JIRA_VAO_DAY",
+    "statuses": {
+      "todo": "To do",
+      "inProgress": "In Progress",
+      "reopened": "Reopened",
+      "inReview": "In Review",
+      "done": "Done Test"
+    }
+  },
+  "bitbucket": {
+    "url": "https://git-sds.softdreams.vn:7990",
+    "token": "DAN_HTTP_ACCESS_TOKEN_BITBUCKET_VAO_DAY"
+  },
+  "gitea": {
+    "url": "http://10.100.120.190:30089",
+    "owner": "admin"
+  },
+  "git": {
+    "user": "DAN_TEN_CUA_BAN_VD_minhpm",
+    "baseBranch": "prod",
+    "protectedBranches": [
+      "prod",
+      "prod-133",
+      "master",
+      "main",
+      "test",
+      "dev-99",
+      "dev-mix",
+      "dev-2"
+    ]
+  },
+  "insecureTls": false,
+  "reposRoot": "C:/PNMINH/sds",
+  "worklogDir": "C:/path/to/_worklog",
+  "repos": {
+    "200133ebwebbe": {
+      "prTargets": [
+        "test",
+        "dev-99"
+      ]
+    },
+    "200133ebwebfe": {
+      "prTargets": [
+        "test",
+        "dev-99"
+      ]
+    },
+    "200133ebqueue": {
+      "prTargets": [
+        "test",
+        "dev-99"
+      ]
+    },
+    "200133ebreport": {
+      "prTargets": [
+        "test",
+        "dev-99"
+      ]
+    },
+    "200133ebcoremodel": {
+      "prTargets": [
+        "test",
+        "dev-99"
+      ]
+    },
+    "88ebweb": {
+      "prTargets": [
+        "dev-2"
+      ],
+      "giteaRepo": "ebweb88"
+    },
+    "88ebqueue": {
+      "prTargets": [
+        "dev-2"
+      ]
+    }
+  },
+  "databases": {
+    "test1": {
+      "server": "DAN_IP_DB_TEST",
+      "port": 1433,
+      "database": "DAN_TEN_DATABASE",
+      "user": "DAN_USER_CHI_DOC",
+      "password": "DAN_MAT_KHAU",
+      "note": "DB local/test nhóm 1 (dùng chung với test)"
+    }
+  },
+  "blockedDbHosts": []
+}
